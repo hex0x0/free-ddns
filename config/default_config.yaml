@@ -1,0 +1,24 @@
+domainNames: # domain names to be resolved
+  - yourDomainNames
+
+ipAddressVersion: ipv4 # ipv4 or ipv6
+
+dnsProvider:
+  name: tencent # tencent or aliyun or cloudflare
+  credential: # set credentials according to the dns provider
+    tencent:
+      secretId: xx
+      secretKey: xx
+    aliyun:
+      accessKeyId: xx
+      accessKeySecret: xx
+    cloudflare:
+      token: xxx
+
+# Optional. If configured, a message will be sent when any DNS record is updated.
+notifier:
+  name: telegram
+  credential:
+    telegram:
+      chatId: xx
+      botToken: xx
