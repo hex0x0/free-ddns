@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/hex0x0/free-ddns/config"
 )
 
@@ -80,4 +82,43 @@ func InitNotifier(cfg *config.Config) (Notifier, error) {
 	default:
 		return nil, fmt.Errorf("unsupported notification channel: %s", cfg.Notifier.Name)
 	}
+}
+
+// notifyWithRetry sends notification with retry on failure.
+func notifyWithRetry(
+	ctx context.Context,
+	notifier Notifier,
+	result map[string]*ExecutionResult,
+	maxAttempts int,
+	delay time.Duration,
+) error {
+	if notifier == nil {
+		return nil
+	}
+
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
+		if attempt > 1 {
+			t := time.NewTimer(delay)
+			select {
+			case <-ctx.Done():
+				t.Stop()
+				return ctx.Err()
+			case <-t.C:
+				logrus.Warnf("notification retrying: attempt=%d/%d delay=%s", attempt, maxAttempts, delay)
+			}
+		}
+
+		if err := notifier.Notify(ctx, result); err != nil {
+			lastErr = err
+			logrus.Warnf("send notification failed: attempt=%d/%d err=%+v", attempt, maxAttempts, err)
+			continue
+		}
+		return nil
+	}
+	return lastErr
 }

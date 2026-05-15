@@ -101,9 +101,8 @@ func runOnce(ctx context.Context, ddnsExecutor DdnsExecutor, notifier Notifier) 
 	if notifier != nil && updatedCount > 0 {
 		logrus.Infof("notification started")
 
-		// NOTE: We don’t want notification failures to fail the whole ddns run.
-		if nerr := notifier.Notify(ctx, res); nerr != nil {
-			logrus.Warnf("send notification failed: %+v", nerr)
+		if nerr := notifyWithRetry(ctx, notifier, res, 3, 2*time.Minute); nerr != nil {
+			logrus.Warnf("send notification failed after retries: %+v", nerr)
 		}
 	}
 
