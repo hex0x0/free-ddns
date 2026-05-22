@@ -151,7 +151,7 @@ dnsProvider:
       token: "xxx"
 
 # Optional. If configured, a message will be sent when any DNS record is updated.
-Notifier:
+notifier:
   name: telegram
   credential:
     telegram:
