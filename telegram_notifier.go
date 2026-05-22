@@ -8,8 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
-
-	"github.com/sirupsen/logrus"
+	"time"
 
 	"github.com/hex0x0/free-ddns/config"
 )
@@ -21,33 +20,23 @@ type TelegramNotifier struct {
 	httpClient *http.Client
 }
 
-func (n *TelegramNotifier) Notify(ctx context.Context, result map[string]*ExecutionResult) error {
+func (n *TelegramNotifier) Notify(ctx context.Context, result ExecutionResult) error {
 	// NOTE: we must not URL-escape the bot token. Telegram tokens contain ':' and
 	// other characters that are part of the path segment.
 	endpoint := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", n.cfg.Notifier.Credential.Telegram.BotToken)
 
-	updatedDomains := map[string]map[string]string{}
+	updatedDomainsJson, _ := json.MarshalIndent(result.SuccessfulResult.UpdatedDomains, "", "    ")
+	failedDomainsJson, _ := json.MarshalIndent(result.FailedResult, "", "    ")
 
-	for k, v := range result {
-		if v.Updated {
-			updatedDomains[k] = map[string]string{
-				"old_ip": v.OldIP,
-				"new_ip": v.NewIP,
-			}
-		}
-	}
-
-	updatedDomainsJson, _ := json.MarshalIndent(updatedDomains, "", "    ")
-
-	messageTemplate := "free-ddns updated dns record.\n\ndns provider: %s\n\nchange of dns records: \n%s"
+	messageTemplate := "free-ddns updated dns record.\n\ndns provider: %s\n\nexecuted_at: %v\n\nsuccessful_result:\n%s\n\nfailed_result:\n%s"
 
 	message := fmt.Sprintf(
 		messageTemplate,
 		n.cfg.DNSProvider.Name,
-		updatedDomainsJson,
+		result.ExecutedAt.Format(time.RFC3339),
+		string(updatedDomainsJson),
+		string(failedDomainsJson),
 	)
-
-	logrus.Info(message)
 
 	// Keep payload minimal.
 	payload := map[string]any{

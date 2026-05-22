@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -106,70 +107,79 @@ func (executor *TencentDdnsExecutor) updateDnsRecord(recordId *uint64, domain st
 	return nil
 }
 
-func (executor *TencentDdnsExecutor) Execute() (map[string]*ExecutionResult, error) {
-	res := map[string]*ExecutionResult{}
+func (executor *TencentDdnsExecutor) Execute() ExecutionResult {
+	res := ExecutionResult{
+		ExecutedAt: time.Now(),
+		SuccessfulResult: SuccessfulResult{
+			UpdatedDomains:    make([]DomainUpdateInfo, 0),
+			UnmodifiedDomains: make([]string, 0),
+		},
+		FailedResult: make([]FailedInfo, 0),
+	}
 
-	exeFailedDomains := make([]string, 0)
+	publicIP, getIpErr := executor.ipGetter.GetPublicIP()
 
-	for _, dm := range executor.domainNames {
-		domain, subdomain := ParseDomain(dm)
-		logrus.Debugf("domain=%s subdomain=%s", domain, subdomain)
-
-		publicIP, err := executor.ipGetter.GetPublicIP()
-		if err != nil {
-			logrus.Errorf("getPublicIP return err, err=%+v", err)
-			exeFailedDomains = append(exeFailedDomains, dm)
+	for _, domainName := range executor.domainNames {
+		if getIpErr != nil {
+			logrus.Errorf("getPublicIP return err, err=%+v", getIpErr)
+			res.FailedResult = append(res.FailedResult, FailedInfo{
+				DomainNames: domainName,
+				Reason:      "get public IP failed",
+			})
 			continue
 		}
-		logrus.Debugf("publicIP=%s", publicIP)
+
+		logrus.Infof("publicIP=%s", publicIP)
+
+		domain, subdomain := ParseDomain(domainName)
+		logrus.Infof("domain=%s subdomain=%s", domain, subdomain)
 
 		currentDnsRecord, err := executor.queryDnsRecord(domain, subdomain)
 		if err != nil {
 			logrus.Errorf("queryDnsRecord failed, err=%+v", err)
-			exeFailedDomains = append(exeFailedDomains, dm)
+			res.FailedResult = append(res.FailedResult, FailedInfo{
+				DomainNames: domainName,
+				Reason:      fmt.Sprintf("queryDnsRecord failed: %v", err),
+			})
 			continue
 		}
 
 		if currentDnsRecord == nil {
-			logrus.Infof("createDnsRecord domain=%s.%s ip=%s", subdomain, domain, publicIP)
 			if err := executor.createDnsRecord(domain, subdomain, publicIP); err != nil {
 				logrus.Errorf("createDnsRecord failed, err=%+v", err)
-				exeFailedDomains = append(exeFailedDomains, dm)
+				res.FailedResult = append(res.FailedResult, FailedInfo{
+					DomainNames: domainName,
+					Reason:      fmt.Sprintf("createDnsRecord failed: %v", err),
+				})
 				continue
 			}
-			res[dm] = &ExecutionResult{
-				Updated: true,
-				OldIP:   "",
-				NewIP:   publicIP,
-			}
+			res.SuccessfulResult.UpdatedDomains = append(res.SuccessfulResult.UpdatedDomains, DomainUpdateInfo{
+				DomainName: domainName,
+				OldIp:      "",
+				NewIp:      publicIP,
+			})
 			continue
 		}
 
 		if *currentDnsRecord.Value != publicIP {
-			logrus.Infof("updateDnsRecord domain=%s.%s old ip=%s new ip=%s", subdomain, domain, *currentDnsRecord.Value, publicIP)
 			if err := executor.updateDnsRecord(currentDnsRecord.RecordId, domain, subdomain, publicIP); err != nil {
 				logrus.Errorf("updateDnsRecord failed, err=%+v", err)
-				exeFailedDomains = append(exeFailedDomains, dm)
+				res.FailedResult = append(res.FailedResult, FailedInfo{
+					DomainNames: domainName,
+					Reason:      fmt.Sprintf("updateDnsRecord failed: %v", err),
+				})
 				continue
 			}
-			res[dm] = &ExecutionResult{
-				Updated: true,
-				OldIP:   *currentDnsRecord.Value,
-				NewIP:   publicIP,
-			}
+			res.SuccessfulResult.UpdatedDomains = append(res.SuccessfulResult.UpdatedDomains, DomainUpdateInfo{
+				DomainName: domainName,
+				OldIp:      *currentDnsRecord.Value,
+				NewIp:      publicIP,
+			})
 			continue
 		}
 
-		res[dm] = &ExecutionResult{
-			Updated: false,
-			OldIP:   *currentDnsRecord.Value,
-			NewIP:   *currentDnsRecord.Value,
-		}
+		res.SuccessfulResult.UnmodifiedDomains = append(res.SuccessfulResult.UnmodifiedDomains, domainName)
 	}
 
-	if len(exeFailedDomains) > 0 {
-		return res, errors.New(fmt.Sprintf("%v", exeFailedDomains))
-	}
-
-	return res, nil
+	return res
 }

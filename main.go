@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"os/signal"
@@ -76,37 +77,21 @@ func runOnce(ctx context.Context, ddnsExecutor DdnsExecutor, notifier Notifier) 
 	start := time.Now()
 	logrus.Infof("ddns execution started")
 
-	res, err := ddnsExecutor.Execute()
-	if err != nil {
-		logrus.Errorf("ddns execution failed: %v", err)
-	}
-	if res == nil {
-		res = map[string]*ExecutionResult{}
-	}
-
-	updatedCount := 0
-	for domain, r := range res {
-		if r == nil {
-			continue
-		}
-		if r.Updated {
-			updatedCount++
-			logrus.Infof("domain=%s updated oldIP=%s newIP=%s", domain, r.OldIP, r.NewIP)
-		} else {
-			logrus.Infof("domain=%s unchanged ip=%s", domain, r.NewIP)
-		}
-	}
+	res := ddnsExecutor.Execute()
+	resJson, _ := json.Marshal(res)
+	logrus.Infof("ddns execution finished: duration=%s res=%s", time.Since(start), resJson)
 
 	// Notify once per execution if any domain was updated.
-	if notifier != nil && updatedCount > 0 {
+	if notifier != nil && (len(res.SuccessfulResult.UpdatedDomains) > 0 || len(res.FailedResult) > 0) {
 		logrus.Infof("notification started")
 
-		if nerr := notifyWithRetry(ctx, notifier, res, 3, 2*time.Minute); nerr != nil {
-			logrus.Warnf("send notification failed after retries: %+v", nerr)
+		nerr := notifyWithRetry(ctx, notifier, res, 3, 2*time.Minute)
+		if nerr != nil {
+			logrus.Warnf("failed to send notification after retries: %+v", nerr)
+		} else {
+			logrus.Info("send notification successfully")
 		}
 	}
-
-	logrus.Infof("ddns execution finished: duration=%s updated=%d", time.Since(start), updatedCount)
 
 	select {
 	case <-ctx.Done():

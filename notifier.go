@@ -17,7 +17,7 @@ import (
 // Notifier sends a notification message.
 // Implementations should be best-effort and return an error on failure.
 type Notifier interface {
-	Notify(ctx context.Context, result map[string]*ExecutionResult) error
+	Notify(ctx context.Context, result ExecutionResult) error
 }
 
 func httpClientWithProxyFromEnv() (*http.Client, error) {
@@ -88,7 +88,7 @@ func InitNotifier(cfg *config.Config) (Notifier, error) {
 func notifyWithRetry(
 	ctx context.Context,
 	notifier Notifier,
-	result map[string]*ExecutionResult,
+	result ExecutionResult,
 	maxAttempts int,
 	delay time.Duration,
 ) error {
