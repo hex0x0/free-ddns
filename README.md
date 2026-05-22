@@ -19,7 +19,7 @@ This will:
 1. Install the binary via `go install github.com/hex0x0/free-ddns@latest`
 2. Copy it to `/usr/local/bin/free-ddns`
 3. Create `$HOME/.config/free-ddns/config.yaml` if it doesn’t exist
-4. Install a systemd unit: `/etc/systemd/system/free-ddns.service`
+4. Install a systemd unit: `/etc/systemd/system/free-ddns.service` if it doesn’t exist
 
 Enable and start service:
 
@@ -130,6 +130,8 @@ Notes:
 ### 2.5 Full example
 
 ```yaml
+# Location: ~/.config/free-ddns/config.yaml
+
 domainNames:
   - example.com
   - home.example.com
