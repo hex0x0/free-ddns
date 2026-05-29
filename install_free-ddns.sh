@@ -103,17 +103,22 @@ write_systemd_unit_if_missing() {
 
   echo "==> Installing systemd unit: ${SYSTEMD_UNIT_DST} (requires sudo)"
   # Note: we use sudo + tee so this works even when the script is piped from wget/curl.
+  USER_NAME="$(id -un)"
+  GROUP_NAME="$(id -gn)"
   cat <<EOF_UNIT | sudo tee "${SYSTEMD_UNIT_DST}" >/dev/null
 [Unit]
 Description=free-ddns dynamic DNS updater
 Documentation=https://github.com/hex0x0/free-ddns
 After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
 NoNewPrivileges=true
+User=${USER_NAME}
+Group=${GROUP_NAME}
 Environment=HOME=$HOME
-ExecStart=/usr/local/bin/free-ddns
+ExecStart=$HOME/go/bin/free-ddns
 Restart=on-failure
 RestartPreventExitStatus=23
 
@@ -168,9 +173,7 @@ EOF_GO
   require_cmd systemctl
 
   INSTALLED_BIN="$(go_install_free_ddns)"
-
-  echo "==> Installing binary to /usr/local/bin/${BINARY_NAME} (requires root)"
-  sudo install -m 0755 "${INSTALLED_BIN}" "/usr/local/bin/${BINARY_NAME}"
+  echo "==> Binary has been installed to ${INSTALLED_BIN}"
 
   write_default_config_if_missing
 
