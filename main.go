@@ -15,7 +15,11 @@ import (
 )
 
 func init() {
-	logrus.SetLevel(logrus.InfoLevel)
+	logrus.SetFormatter(&logrus.TextFormatter{
+		FullTimestamp:   true,
+		TimestampFormat: time.RFC3339,
+		ForceColors:     true,
+	})
 }
 
 func main() {
