@@ -28,29 +28,23 @@ func main() {
 		logrus.Fatalf("resolve default config path: %v", err)
 	}
 
-	cfg, err := config.Load(configPath)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			logrus.Fatalf("config file not found: %s", configPath)
-		}
-		logrus.Fatalf("load config failed, path: %s err: %v", configPath, err)
-	}
+	config.MustLoad(configPath)
 
-	err = checkConfig(cfg)
+	err = checkConfig()
 	if err != nil {
 		logrus.Fatalf("check config file failed, err: %+v", err)
 	}
 
 	logrus.Infof("loaded config from %s", configPath)
 	logrus.Infof("domainNames=%v ipAddressVersion=%s dnsProvider=%s\n",
-		cfg.DomainNames, cfg.IPAddressVersion, cfg.DNSProvider.Name)
+		config.Config.DomainNames, config.Config.IPAddressVersion, config.Config.DNSProvider.Name)
 
-	ddnsExecutor := initDdnsExecutor(cfg)
+	ddnsExecutor := initDdnsExecutor()
 	if ddnsExecutor == nil {
 		logrus.Fatalf("ddns executor is nil")
 	}
 
-	notifier, err := InitNotifier(cfg)
+	notifier, err := InitNotifier()
 	if err != nil {
 		logrus.Fatalf("init notifier failed: %v", err)
 	}
@@ -60,6 +54,9 @@ func main() {
 
 	// Run once on startup.
 	runOnce(ctx, ddnsExecutor, notifier)
+
+	// Start heartbeat scheduler to send messages every Monday at 9:00 AM
+	StartHeartbeatScheduler(ctx, notifier)
 
 	// Then run every 15 minutes.
 	ticker := time.NewTicker(15 * time.Minute)
@@ -89,12 +86,14 @@ func runOnce(ctx context.Context, ddnsExecutor DdnsExecutor, notifier Notifier) 
 	if notifier != nil && (len(res.SuccessfulResult.UpdatedDomains) > 0 || len(res.FailedResult) > 0) {
 		logrus.Infof("notification started")
 
-		nerr := notifyWithRetry(ctx, notifier, res, 3, 2*time.Minute)
-		if nerr != nil {
-			logrus.Warnf("failed to send notification after retries: %+v", nerr)
-		} else {
-			logrus.Info("send notification successfully")
-		}
+		go func() {
+			nerr := NotifyWithRetry(ctx, notifier, res.ToMessage(), 3, 2*time.Minute)
+			if nerr != nil {
+				logrus.Warnf("failed to send notification after retries: %+v", nerr)
+			} else {
+				logrus.Info("send notification successfully")
+			}
+		}()
 	}
 
 	select {
@@ -104,26 +103,26 @@ func runOnce(ctx context.Context, ddnsExecutor DdnsExecutor, notifier Notifier) 
 	}
 }
 
-func checkConfig(cfg *config.Config) error {
-	if len(cfg.DomainNames) == 0 {
+func checkConfig() error {
+	if len(config.Config.DomainNames) == 0 {
 		return errors.New("domain names are empty")
 	}
 
 	dnsProviders := map[string]string{
-		"tencent":    "",
-		"aliyun":     "",
-		"cloudflare": "",
+		DnsProviderTencent:    "",
+		DnsProviderAliyun:     "",
+		DnsProviderCloudflare: "",
 	}
-	if _, ok := dnsProviders[cfg.DNSProvider.Name]; !ok {
+	if _, ok := dnsProviders[config.Config.DNSProvider.Name]; !ok {
 		return errors.New("dns provider not supported")
 	}
 
 	return nil
 }
 
-func initDdnsExecutor(cfg *config.Config) DdnsExecutor {
-	if cfg.DNSProvider.Name == "tencent" {
-		executor, err := InitTencentDdnsExecutor(cfg)
+func initDdnsExecutor() DdnsExecutor {
+	if config.Config.DNSProvider.Name == DnsProviderTencent {
+		executor, err := InitTencentDdnsExecutor()
 		if err != nil {
 			logrus.Fatalf("init tencent ddns executor failed, err: %v", err)
 		}

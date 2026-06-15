@@ -25,8 +25,8 @@ type IPGetter interface {
 	GetPublicIP() (string, error)
 }
 
-func NewIpGetter(cfg *config.Config) IPGetter {
-	if cfg.IPAddressVersion == "ipv4" {
+func NewIpGetter() IPGetter {
+	if config.Config.IPAddressVersion == "ipv4" {
 		return IPV4Getter{}
 	}
 

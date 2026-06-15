@@ -17,7 +17,7 @@ import (
 // Notifier sends a notification message.
 // Implementations should be best-effort and return an error on failure.
 type Notifier interface {
-	Notify(ctx context.Context, result ExecutionResult) error
+	Notify(ctx context.Context, message string) error
 }
 
 func httpClientWithProxyFromEnv() (*http.Client, error) {
@@ -57,8 +57,8 @@ func httpClientWithProxyFromEnv() (*http.Client, error) {
 	return res, nil
 }
 
-func InitNotifier(cfg *config.Config) (Notifier, error) {
-	if cfg == nil || cfg.Notifier == nil {
+func InitNotifier() (Notifier, error) {
+	if config.Config.Notifier == nil {
 		return nil, nil
 	}
 
@@ -67,31 +67,30 @@ func InitNotifier(cfg *config.Config) (Notifier, error) {
 		return nil, fmt.Errorf("init notifier's http client failed, err: %+v", err)
 	}
 
-	switch strings.ToLower(cfg.Notifier.Name) {
+	switch strings.ToLower(config.Config.Notifier.Name) {
 	case "telegram":
-		cred := cfg.Notifier.Credential.Telegram
+		cred := config.Config.Notifier.Credential.Telegram
 		if strings.TrimSpace(cred.ChatID) == "" || strings.TrimSpace(cred.BotToken) == "" {
 			return nil, fmt.Errorf("telegram notification configured but chatId/botToken is empty")
 		}
 		return &TelegramNotifier{
-			cfg:        cfg,
+			credential: config.Config.Notifier.Credential.Telegram,
 			httpClient: httpClient,
 		}, nil
 	case "":
 		return nil, nil
 	default:
-		return nil, fmt.Errorf("unsupported notification channel: %s", cfg.Notifier.Name)
+		return nil, fmt.Errorf("unsupported notification channel: %s", config.Config.Notifier.Name)
 	}
 }
 
-// notifyWithRetry sends notification with retry on failure.
-func notifyWithRetry(
-	ctx context.Context,
+// NotifyWithRetry sends notification with retry on failure.
+func NotifyWithRetry(ctx context.Context,
 	notifier Notifier,
-	result ExecutionResult,
+	message string,
 	maxAttempts int,
-	delay time.Duration,
-) error {
+	delay time.Duration) error {
+
 	if notifier == nil {
 		return nil
 	}
@@ -113,9 +112,9 @@ func notifyWithRetry(
 			}
 		}
 
-		if err := notifier.Notify(ctx, result); err != nil {
+		if err := notifier.Notify(ctx, message); err != nil {
 			lastErr = err
-			logrus.Warnf("send notification failed: attempt=%d/%d err=%+v", attempt, maxAttempts, err)
+			logrus.Warnf("send notification failed: attempt=%d/%d msg=%s err=%+v", attempt, maxAttempts, message, err)
 			continue
 		}
 		return nil

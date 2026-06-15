@@ -23,22 +23,22 @@ type TencentDdnsExecutor struct {
 	domainNames []string
 }
 
-func InitTencentDdnsExecutor(cfg *config.Config) (*TencentDdnsExecutor, error) {
+func InitTencentDdnsExecutor() (*TencentDdnsExecutor, error) {
 	credential := common.NewCredential(
-		cfg.DNSProvider.Credential.Tencent.SecretID,
-		cfg.DNSProvider.Credential.Tencent.SecretKey,
+		config.Config.DNSProvider.Credential.Tencent.SecretID,
+		config.Config.DNSProvider.Credential.Tencent.SecretKey,
 	)
 	client, err := dnspod.NewClient(credential, "", profile.NewClientProfile())
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("init dnspod client failed, err: %v", err))
 	}
 
-	ipGetter := NewIpGetter(cfg)
+	ipGetter := NewIpGetter()
 
 	return &TencentDdnsExecutor{
 		ipGetter:    ipGetter,
 		client:      client,
-		domainNames: cfg.DomainNames,
+		domainNames: config.Config.DomainNames,
 	}, nil
 }
 
@@ -109,7 +109,8 @@ func (executor *TencentDdnsExecutor) updateDnsRecord(recordId *uint64, domain st
 
 func (executor *TencentDdnsExecutor) Execute() ExecutionResult {
 	res := ExecutionResult{
-		ExecutedAt: time.Now(),
+		ExecutedAt:  time.Now(),
+		DnsProvider: DnsProviderTencent,
 		SuccessfulResult: SuccessfulResult{
 			UpdatedDomains:    make([]DomainUpdateInfo, 0),
 			UnmodifiedDomains: make([]string, 0),

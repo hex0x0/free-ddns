@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/hex0x0/free-ddns/config"
 )
@@ -16,31 +15,18 @@ import (
 // TelegramNotifier sends message via Telegram Bot API.
 // Docs: https://core.telegram.org/bots/api#sendmessage
 type TelegramNotifier struct {
-	cfg        *config.Config
+	credential config.TelegramCredential
 	httpClient *http.Client
 }
 
-func (n *TelegramNotifier) Notify(ctx context.Context, result ExecutionResult) error {
+func (n *TelegramNotifier) Notify(ctx context.Context, message string) error {
 	// NOTE: we must not URL-escape the bot token. Telegram tokens contain ':' and
 	// other characters that are part of the path segment.
-	endpoint := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", n.cfg.Notifier.Credential.Telegram.BotToken)
-
-	updatedDomainsJson, _ := json.MarshalIndent(result.SuccessfulResult.UpdatedDomains, "", "    ")
-	failedDomainsJson, _ := json.MarshalIndent(result.FailedResult, "", "    ")
-
-	messageTemplate := "free-ddns updated dns record.\n\ndns provider: %s\n\nexecuted_at: %v\n\nsuccessful_result:\n%s\n\nfailed_result:\n%s"
-
-	message := fmt.Sprintf(
-		messageTemplate,
-		n.cfg.DNSProvider.Name,
-		result.ExecutedAt.Format(time.RFC3339),
-		string(updatedDomainsJson),
-		string(failedDomainsJson),
-	)
+	endpoint := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", n.credential.BotToken)
 
 	// Keep payload minimal.
 	payload := map[string]any{
-		"chat_id": n.cfg.Notifier.Credential.Telegram.ChatID,
+		"chat_id": n.credential.ChatID,
 		"text":    message,
 	}
 	b, err := json.Marshal(payload)

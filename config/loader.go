@@ -19,16 +19,20 @@ func DefaultPath() (string, error) {
 	return filepath.Join(home, ".config", "free-ddns", "config.yaml"), nil
 }
 
-// Load reads the configuration from path and unmarshals YAML into Config.
-func Load(path string) (*Config, error) {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("read config file %q: %w", path, err)
+var Config *AppConfig
+
+// MustLoad reads the configuration from path and unmarshals YAML into Config.
+func MustLoad(path string) {
+	if Config != nil {
+		return
 	}
 
-	var cfg Config
-	if err := yaml.Unmarshal(b, &cfg); err != nil {
-		return nil, fmt.Errorf("parse YAML config %q: %w", path, err)
+	b, err := os.ReadFile(path)
+	if err != nil {
+		panic(fmt.Errorf("read config file %q: %w", path, err))
 	}
-	return &cfg, nil
+
+	if err := yaml.Unmarshal(b, &Config); err != nil {
+		panic(fmt.Errorf("parse YAML config %q: %w", path, err))
+	}
 }

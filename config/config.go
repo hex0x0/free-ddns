@@ -1,10 +1,10 @@
 package config
 
-// Config models the user configuration file (by default: $HOME/.config/free-ddns/config.yaml).
+// AppConfig models the user configuration file (by default: $HOME/.config/free-ddns/config.yaml).
 //
 // The struct is intended to be used with a YAML unmarshaller (e.g. gopkg.in/yaml.v3)
 // so the `yaml` tags must match the YAML keys.
-type Config struct {
+type AppConfig struct {
 	DomainNames      []string    `yaml:"domainNames" json:"domainNames"`
 	IPAddressVersion string      `yaml:"ipAddressVersion" json:"ipAddressVersion"`
 	DNSProvider      DNSProvider `yaml:"dnsProvider" json:"dnsProvider"`
@@ -15,11 +15,11 @@ type Config struct {
 }
 
 type DNSProvider struct {
-	Name       string     `yaml:"name" json:"name"`
-	Credential Credential `yaml:"credential" json:"credential"`
+	Name       string        `yaml:"name" json:"name"`
+	Credential DnsCredential `yaml:"credential" json:"credential"`
 }
 
-type Credential struct {
+type DnsCredential struct {
 	Tencent    TencentCredential    `yaml:"tencent" json:"tencent"`
 	Aliyun     AliyunCredential     `yaml:"aliyun" json:"aliyun"`
 	Cloudflare CloudflareCredential `yaml:"cloudflare" json:"cloudflare"`
