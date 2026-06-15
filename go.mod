@@ -1,6 +1,6 @@
 module github.com/hex0x0/free-ddns
 
-go 1.26.2
+go 1.25.11
 
 require (
 	github.com/pkg/errors v0.9.1
