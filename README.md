@@ -11,28 +11,34 @@ DDNS client.
 ## 1. Install
 
 ```bash
-wget -qO- https://raw.githubusercontent.com/hex0x0/free-ddns/refs/heads/main/install_free-ddns.sh | bash
+sudo dpkg -i free-ddns_amd64.deb
 ```
 
 This will:
 
-1. Install the binary via `go install github.com/hex0x0/free-ddns@latest`
-2. Copy it to `/usr/local/bin/free-ddns`
-3. Create `$HOME/.config/free-ddns/config.yaml` if it doesn’t exist
-4. Install a systemd unit: `/etc/systemd/system/free-ddns.service` if it doesn’t exist
+1. Install binary to `/usr/local/bin/free-ddns`
+2. Install config file to `/usr/local/share/free-ddns/config.yaml` if it doesn’t exist
+3. Install a systemd unit: `/lib/systemd/system/free-ddns.service` if it doesn’t exist
 
-Enable and start service:
+The installer **does not start the service automatically**.
+
+Enable service at boot (optional):
 
 ```
-sudo systemctl enable free-ddns
-sudo systemctl start free-ddns
+sudo systemctl enable free-ddns.service
+```
+
+Start service manually when ready:
+
+```bash
+sudo systemctl start free-ddns.service
 ```
 
 ## 2. Configuration
 
-Config file location: `$HOME/.config/free-ddns/config.yaml`
+Config file location: `/usr/local/share/free-ddns/config.yaml`
 
-The install script will create this file for you (if it doesn’t exist). After editing the config, restart the service:
+The install script will create this file for you. After editing the config, restart the service:
 
 ```bash
 sudo systemctl restart free-ddns.service
@@ -87,7 +93,7 @@ Supported values in config:
 Credentials live under `dnsProvider.credential.<provider>`. Keep this file private (it contains secrets):
 
 ```bash
-chmod 600 "$HOME/.config/free-ddns/config.yaml"
+sudo chmod 600 /usr/local/share/free-ddns/config.yaml
 ```
 
 #### 2.3.1.1 Tencent (DNSPod)
@@ -130,7 +136,7 @@ Notes:
 ### 2.5 Full example
 
 ```yaml
-# Location: ~/.config/free-ddns/config.yaml
+# Location: /usr/local/share/free-ddns/config.yaml
 
 domainNames:
   - example.com
