@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/hex0x0/free-ddns/config"
 )
 
@@ -44,7 +46,11 @@ func (n *TelegramNotifier) Notify(ctx context.Context, message string) error {
 	if err != nil {
 		return fmt.Errorf("send telegram request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		if err := Body.Close(); err != nil {
+			logrus.Warn("close body reader failed")
+		}
+	}(resp.Body)
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<10))

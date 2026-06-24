@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"github.com/urfave/cli/v3"
 
 	"github.com/hex0x0/free-ddns/config"
 )
@@ -23,30 +24,72 @@ func init() {
 }
 
 func main() {
-	configPath, err := config.DefaultPath()
-	if err != nil {
-		logrus.Fatalf("resolve default config path: %v", err)
+	app := &cli.Command{
+		Name:  "free-ddns",
+		Usage: "A free DDNS client",
+		Commands: []*cli.Command{
+			{
+				Name:  "run",
+				Usage: "Start the DDNS service",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:    "config",
+						Aliases: []string{"c"},
+						Usage:   "Path to config file (default: $HOME/.config/free-ddns/config.yaml)",
+					},
+				},
+				Action: func(_ context.Context, command *cli.Command) error {
+					runCommand(command.String("config"))
+					return nil
+				},
+			},
+			{
+				Name:  "version",
+				Usage: "Print version information",
+				Action: func(_ context.Context, _ *cli.Command) error {
+					printVersion()
+					return nil
+				},
+			},
+		},
 	}
 
-	config.MustLoad(configPath)
+	if err := app.Run(context.Background(), os.Args); err != nil {
+		logrus.Fatal(err)
+	}
+}
 
-	err = checkConfig()
-	if err != nil {
+func runCommand(configPath string) {
+	var finalConfigPath string
+	if configPath != "" {
+		finalConfigPath = configPath
+	} else {
+		defaultPath, err := config.DefaultPath()
+		if err != nil {
+			logrus.Fatalf("get default config file failed. err: %+v", err)
+		}
+		finalConfigPath = defaultPath
+	}
+
+	if err := config.Load(finalConfigPath); err != nil {
+		logrus.Fatalf("load config file failed, err: %+v", err)
+	}
+
+	if err := checkConfig(); err != nil {
 		logrus.Fatalf("check config file failed, err: %+v", err)
 	}
 
-	logrus.Infof("loaded config from %s", configPath)
-	logrus.Infof("domainNames=%v ipAddressVersion=%s dnsProvider=%s\n",
-		config.Config.DomainNames, config.Config.IPAddressVersion, config.Config.DNSProvider.Name)
+	logrus.Infof("loaded config from %s domainNames=%v ipAddressVersion=%s dnsProvider=%s\n",
+		finalConfigPath, config.Config.DomainNames, config.Config.IPAddressVersion, config.Config.DNSProvider.Name)
 
-	ddnsExecutor := initDdnsExecutor()
+	ddnsExecutor := InitDdnsExecutor()
 	if ddnsExecutor == nil {
 		logrus.Fatalf("ddns executor is nil")
 	}
 
 	notifier, err := InitNotifier()
 	if err != nil {
-		logrus.Fatalf("init notifier failed: %v", err)
+		logrus.Fatalf("init notifier failed. err: %v", err)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -55,7 +98,7 @@ func main() {
 	// Run once on startup.
 	runOnce(ctx, ddnsExecutor, notifier)
 
-	// Start heartbeat scheduler to send messages every Monday at 9:00 AM
+	// Start heartbeat scheduler to send messages periodically
 	StartHeartbeatScheduler(ctx, notifier)
 
 	// Then run every 15 minutes.
@@ -115,18 +158,6 @@ func checkConfig() error {
 	}
 	if _, ok := dnsProviders[config.Config.DNSProvider.Name]; !ok {
 		return errors.New("dns provider not supported")
-	}
-
-	return nil
-}
-
-func initDdnsExecutor() DdnsExecutor {
-	if config.Config.DNSProvider.Name == DnsProviderTencent {
-		executor, err := InitTencentDdnsExecutor()
-		if err != nil {
-			logrus.Fatalf("init tencent ddns executor failed, err: %v", err)
-		}
-		return executor
 	}
 
 	return nil

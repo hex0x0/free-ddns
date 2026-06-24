@@ -21,18 +21,20 @@ func DefaultPath() (string, error) {
 
 var Config *AppConfig
 
-// MustLoad reads the configuration from path and unmarshals YAML into Config.
-func MustLoad(path string) {
+// Load reads the configuration from path and unmarshals YAML into Config.
+func Load(path string) error {
 	if Config != nil {
-		return
+		return nil
 	}
 
 	b, err := os.ReadFile(path)
 	if err != nil {
-		panic(fmt.Errorf("read config file %q: %w", path, err))
+		return fmt.Errorf("read config file failed, path: %s err: %+v", path, err)
 	}
 
-	if err := yaml.Unmarshal(b, &Config); err != nil {
-		panic(fmt.Errorf("parse YAML config %q: %w", path, err))
+	if err = yaml.Unmarshal(b, &Config); err != nil {
+		return fmt.Errorf("parse YAML config failed, path: %s err: %+v", path, err)
 	}
+
+	return nil
 }
